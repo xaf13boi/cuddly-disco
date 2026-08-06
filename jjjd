@@ -1,288 +1,48 @@
---[[
-	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
-]]
---[[
-	WARNING: Heads up! This script has not been verified by ScriptBlox. Use at your own risk!
-]]
-local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
-local UserInputService = game:GetService("UserInputService")
-local RunService = game:GetService("RunService")
+_G.Reach = "8"
+_G.KeyBindHigher = "q"
+_G.KeyBindLower = "z"
+_G.ReachOff = false -- 
 
--- 1. Configuration
-local MIN_TIME = 2000
-local MAX_TIME = 300000000 
-local IS_ACTIVE = false 
-local IS_SPECTATING = false
-local HITBOX_SIZE = Vector3.new(12, 12, 12)
-local DEFAULT_SIZE = Vector3.new(2, 2, 1)
-local SAFE_ZONE_BUFFER = 4 
-local TP_OFFSET = 0.5 
-local PANIC_HEALTH = 25
-local ATTACK_SPEED = 0.05 
-
--- 2. References
-local spawnFolder = Workspace:WaitForChild("Terrain"):WaitForChild("Spawn")
-local myPlayer = Players.LocalPlayer 
-local camera = Workspace.CurrentCamera
-local spectateIndex = 1
-
-local pvpCheckParams = OverlapParams.new()
-pvpCheckParams.FilterType = Enum.RaycastFilterType.Exclude
-
--- 3. Draggable Logic
-local function makeDraggable(gui)
-    local dragging, dragInput, dragStart, startPos
-    gui.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            dragging = true dragStart = input.Position startPos = gui.Position
-            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
-        end
+game:GetService"RunService".Stepped:Connect(function()
+    if _G.ReachOff then return end
+    pcall(function()
+      Sword = game.Players.LocalPlayer.Character:FindFirstChildOfClass("Tool").Handle
+        for i,v in pairs(game.Players:GetPlayers()) do 
+            if v ~= game.Players.LocalPlayer and v.Character:FindFirstChild("Left Arm") then
+             if (game.Players.LocalPlayer.Character.Torso.Position - v.Character.Torso.Position).Magnitude <= _G.Reach then
+                   v.Character['Left Arm']:BreakJoints()
+                   v.Character['Left Arm'].Transparency = 1
+                   v.Character['Left Arm'].CanCollide = false
+                   v.Character['Left Arm'].CFrame = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(1,0,-3.5)
+                   v.Character['Left Leg']:BreakJoints()
+                   v.Character['Left Leg'].Transparency = 1
+                   v.Character['Left Leg'].CanCollide = false
+                   v.Character['Left Leg'].CFrame = game.Players.LocalPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(1,0,-3.5)
+               end
+           end
+       end
     end)
-    gui.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            local delta = input.Position - dragStart
-            gui.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
-        end
-    end)
-end
-
--- 4. GUI Setup
-local sg = Instance.new("ScreenGui", myPlayer:WaitForChild("PlayerGui"))
-sg.Name = "UltraHunterGui"
-sg.ResetOnSpawn = false
-
-local mainFrame = Instance.new("Frame", sg)
-mainFrame.Size = UDim2.new(0, 220, 0, 180)
-mainFrame.Position = UDim2.new(0, 20, 0, 20)
-mainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
-mainFrame.BackgroundTransparency = 0.4
-mainFrame.BorderSizePixel = 0
-mainFrame.Active = true
-makeDraggable(mainFrame)
-Instance.new("UICorner", mainFrame).CornerRadius = UDim.new(0, 8)
-
-local button = Instance.new("TextButton", mainFrame)
-button.Size = UDim2.new(1, -20, 0, 45)
-button.Position = UDim2.new(0, 10, 0, 10)
-button.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-button.Text = "ULTRA HUNTER: OFF"
-button.TextColor3 = Color3.new(1,1,1)
-button.Font = Enum.Font.SourceSansBold
-button.TextSize = 14
-Instance.new("UICorner", button).CornerRadius = UDim.new(0, 6)
-
-local minInput = Instance.new("TextBox", mainFrame)
-minInput.Size = UDim2.new(0.45, -5, 0, 30)
-minInput.Position = UDim2.new(0, 10, 0, 60)
-minInput.PlaceholderText = "Min"
-minInput.Text = tostring(MIN_TIME)
-minInput.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-minInput.TextColor3 = Color3.new(1,1,1)
-Instance.new("UICorner", minInput).CornerRadius = UDim.new(0, 4)
-
-local maxInput = Instance.new("TextBox", mainFrame)
-maxInput.Size = UDim2.new(0.45, -5, 0, 30)
-maxInput.Position = UDim2.new(0.55, -5, 0, 60)
-maxInput.PlaceholderText = "Max"
-maxInput.Text = tostring(MAX_TIME)
-maxInput.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-maxInput.TextColor3 = Color3.new(1,1,1)
-Instance.new("UICorner", maxInput).CornerRadius = UDim.new(0, 4)
-
-local spectateBtn = Instance.new("TextButton", mainFrame)
-spectateBtn.Size = UDim2.new(1, -20, 0, 35)
-spectateBtn.Position = UDim2.new(0, 10, 0, 100)
-spectateBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-spectateBtn.Text = "SPECTATE: OFF"
-spectateBtn.TextColor3 = Color3.new(1,1,1)
-spectateBtn.Font = Enum.Font.SourceSansBold
-Instance.new("UICorner", spectateBtn).CornerRadius = UDim.new(0, 6)
-
-local navFrame = Instance.new("Frame", mainFrame)
-navFrame.Size = UDim2.new(1, -20, 0, 30)
-navFrame.Position = UDim2.new(0, 10, 0, 140)
-navFrame.BackgroundTransparency = 1
-navFrame.Visible = false
-
-local prevBtn = Instance.new("TextButton", navFrame)
-prevBtn.Size = UDim2.new(0.3, 0, 1, 0)
-prevBtn.Text = "<"
-prevBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
-prevBtn.TextColor3 = Color3.new(1,1,1)
-
-local nextBtn = Instance.new("TextButton", navFrame)
-nextBtn.Size = UDim2.new(0.3, 0, 1, 0)
-nextBtn.Position = UDim2.new(0.7, 0, 0, 0)
-nextBtn.Text = ">"
-nextBtn.BackgroundColor3 = Color3.fromRGB(30,30,30)
-nextBtn.TextColor3 = Color3.new(1,1,1)
-
-local specName = Instance.new("TextLabel", navFrame)
-specName.Size = UDim2.new(0.4, 0, 1, 0)
-specName.Position = UDim2.new(0.3, 0, 0, 0)
-specName.BackgroundTransparency = 1
-specName.Text = "None"
-specName.TextColor3 = Color3.new(1,1,1)
-specName.TextScaled = true
-
--- 5. Helper Functions
-local function updateSpectate()
-    local plrs = Players:GetPlayers()
-    if not IS_SPECTATING then
-        camera.CameraSubject = myPlayer.Character and myPlayer.Character:FindFirstChild("Humanoid")
-        navFrame.Visible = false
-        return
-    end
-    
-    navFrame.Visible = true
-    if #plrs > 0 then
-        if spectateIndex > #plrs then spectateIndex = 1 end
-        if spectateIndex < 1 then spectateIndex = #plrs end
-        
-        local target = plrs[spectateIndex]
-        if target and target.Character and target.Character:FindFirstChild("Humanoid") then
-            camera.CameraSubject = target.Character.Humanoid
-            specName.Text = target.DisplayName
-        else
-            specName.Text = "Scanning..."
-        end
-    end
-end
-
-local function returnToOriginalSpot(originalCF)
-    local char = myPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart")
-    if hrp and originalCF then
-        hrp.AssemblyLinearVelocity = Vector3.zero
-        char:PivotTo(originalCF)
-    end
-end
-
-local function setHitbox(targetChar, size)
-    local hrp = targetChar and targetChar:FindFirstChild("HumanoidRootPart")
-    if hrp then
-        hrp.Size = size
-        hrp.Transparency = (size == DEFAULT_SIZE) and 0 or 0.7
-        hrp.CanCollide = false 
-    end
-end
-
-local function autoEquipTool(char)
-    local backpack = myPlayer:FindFirstChild("Backpack")
-    if char and backpack then
-        local tool = backpack:FindFirstChildOfClass("Tool")
-        if tool then tool.Parent = char end
-    end
-end
-
-local function isTrulyInPvp(targetChar)
-    local hrp = targetChar:FindFirstChild("HumanoidRootPart")
-    if not hrp then return false end
-    pvpCheckParams.FilterDescendantsInstances = {targetChar, myPlayer.Character}
-    local partsInSpace = Workspace:GetPartBoundsInBox(hrp.CFrame, Vector3.new(SAFE_ZONE_BUFFER, 10, SAFE_ZONE_BUFFER), pvpCheckParams)
-    for _, part in ipairs(partsInSpace) do
-        if part:IsDescendantOf(spawnFolder) then return false end
-    end
-    return true
-end
-
--- 6. Event Listeners
-minInput.FocusLost:Connect(function() MIN_TIME = tonumber(minInput.Text) or 0 end)
-maxInput.FocusLost:Connect(function() MAX_TIME = tonumber(maxInput.Text) or 300000000 end)
-
-button.MouseButton1Click:Connect(function()
-    IS_ACTIVE = not IS_ACTIVE
-    button.Text = IS_ACTIVE and "ULTRA HUNTER: ACTIVE" or "ULTRA HUNTER: OFF"
-    button.BackgroundColor3 = IS_ACTIVE and Color3.fromRGB(0, 150, 0) or Color3.fromRGB(150, 0, 0)
 end)
 
-spectateBtn.MouseButton1Click:Connect(function()
-    IS_SPECTATING = not IS_SPECTATING
-    spectateBtn.Text = IS_SPECTATING and "SPECTATE: ON" or "SPECTATE: OFF"
-    spectateBtn.BackgroundColor3 = IS_SPECTATING and Color3.fromRGB(0, 100, 200) or Color3.fromRGB(50, 50, 50)
-    updateSpectate()
-end)
-
-nextBtn.MouseButton1Click:Connect(function()
-    spectateIndex = spectateIndex + 1
-    updateSpectate()
-end)
-
-prevBtn.MouseButton1Click:Connect(function()
-    spectateIndex = spectateIndex - 1
-    updateSpectate()
-end)
-
-Players.PlayerRemoving:Connect(function()
-    if IS_SPECTATING then updateSpectate() end
-end)
-
--- 7. Main Loop
-task.spawn(function()
-    while true do
-        task.wait(0.01) 
-        if not IS_ACTIVE then continue end
-
-        local myChar = myPlayer.Character
-        local myHum = myChar and myChar:FindFirstChild("Humanoid")
-        local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
-
-        if myChar and myHrp and myHum and myHum.Health > PANIC_HEALTH then
-            for _, target in ipairs(Players:GetPlayers()) do
-                if target == myPlayer then continue end
-                
-                local tChar = target.Character
-                local tHum = tChar and tChar:FindFirstChild("Humanoid")
-                local tHrp = tChar and tChar:FindFirstChild("HumanoidRootPart")
-                local lstats = target:FindFirstChild("leaderstats")
-                local timeVal = lstats and lstats:FindFirstChild("Time")
-
-                if tHrp and tHum and tHum.Health > 0 and timeVal then
-                    if timeVal.Value >= MIN_TIME and timeVal.Value <= MAX_TIME and isTrulyInPvp(tChar) then
-                        
-                        -- Store spot before attack
-                        local preAttackCFrame = myHrp.CFrame
-                        
-                        setHitbox(tChar, HITBOX_SIZE)
-                        local lastAttack = 0
-
-                        repeat 
-                            if tHrp and myHrp and tHum.Health > 0 and myHum.Health > PANIC_HEALTH and IS_ACTIVE then
-                                autoEquipTool(myChar)
-                                myHrp.AssemblyLinearVelocity = Vector3.zero
-                                myHum:ChangeState(Enum.HumanoidStateType.Physics)
-                                
-                                local goalCF = CFrame.lookAt(tHrp.Position + (tHrp.CFrame.LookVector * -TP_OFFSET), tHrp.Position)
-                                myHrp.CFrame = myHrp.CFrame:Lerp(goalCF, 0.8) 
-                                
-                                if tick() - lastAttack > ATTACK_SPEED then
-                                    local tool = myChar:FindFirstChildOfClass("Tool")
-                                    if tool then tool:Activate() end
-                                    lastAttack = tick()
-                                end
-                            end
-                            task.wait() 
-                        until not tHum or tHum.Health <= 0 or myHum.Health <= PANIC_HEALTH or not IS_ACTIVE
-                        
-                        -- Disable Spectate Mode if target is dead
-                        if tHum and tHum.Health <= 0 then
-                            IS_SPECTATING = false
-                            spectateBtn.Text = "SPECTATE: OFF"
-                            spectateBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-                            updateSpectate()
-                        end
-
-                        setHitbox(tChar, DEFAULT_SIZE)
-                        
-                        -- Teleport back to original spot
-                        returnToOriginalSpot(preAttackCFrame)
-                        
-                        break 
-                    end
-                end
-            end
-        end
-    end
-end)
+local Mouse = game.Players.LocalPlayer:GetMouse()
+    Mouse.KeyDown:Connect(function(key)
+        if key == _G.KeyBindHigher then
+                 _G.Reach = _G.Reach + 1 
+             game.StarterGui:SetCore("SendNotification", {
+                 Title = "AzerReach";
+                 Text = "Reach set to " .. _G.Reach;
+                 Icon = "";
+                 Duration = 1;})
+             end
+          end)
+local Mouse = game.Players.LocalPlayer:GetMouse()
+    Mouse.KeyDown:Connect(function(key)
+        if key == _G.KeyBindLower then
+                 _G.Reach = _G.Reach - 1 
+             game.StarterGui:SetCore("SendNotification", {
+                 Title = "AzerReach";
+                 Text = "Reach set to " .. _G.Reach;
+                 Icon = "";
+                 Duration = 1;})
+             end
+          end)
